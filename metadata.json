@@ -1,36 +1,24 @@
 {
-  "replacing": {
+  "groupings": {
 
   },
-  "long_description": "",
-  "attributes": {
-
-  },
-  "maintainer": "37signals",
   "recommendations": {
-
-  },
-  "license": "Apache v2.0",
-  "recipes": {
-    "apt::mirror": "",
-    "apt": ""
-  },
-  "maintainer_email": "sysadmins@37signals.com",
-  "suggestions": {
-
-  },
-  "dependencies": {
-
-  },
-  "conflicting": {
 
   },
   "platforms": {
 
   },
-  "description": "Configures apt",
+  "license": "Apache v2.0",
+  "maintainer": "37signals",
+  "suggestions": {
+
+  },
+  "maintainer_email": "sysadmins@37signals.com",
   "version": "0.1.0",
-  "name": "apt",
+  "conflicting": {
+
+  },
+  "description": "Configures apt",
   "providing": {
     "apt": [
 
@@ -38,5 +26,20 @@
     "apt::mirror": [
 
     ]
+  },
+  "name": "apt",
+  "attributes": {
+
+  },
+  "long_description": "",
+  "recipes": {
+    "apt": "",
+    "apt::mirror": ""
+  },
+  "replacing": {
+
+  },
+  "dependencies": {
+
   }
 }
