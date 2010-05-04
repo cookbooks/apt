@@ -1,3 +1,6 @@
+
+require_recipe 'apt'
+
 if node[:packages]
   node[:packages].each do |group, packages|
     Chef::Log.info "Installing packages for package group, #{group}"
