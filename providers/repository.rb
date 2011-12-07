@@ -18,13 +18,14 @@
 #
 
 action :add do
-  unless ::File.exists?("/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list")
-    Chef::Log.info "Adding #{new_resource.repo_name} repository to /etc/apt/sources.list.d/#{new_resource.repo_name}-source.list"
+    new_resource.updated_by_last_action(false)
+
     # add key
     if new_resource.keyserver && new_resource.key
       execute "install-key #{new_resource.key}" do
         command "apt-key adv --keyserver #{new_resource.keyserver} --recv #{new_resource.key}"
         action :nothing
+        not_if "apt-key list | grep #{new_resource.key}"
       end.run_action(:run)
     elsif new_resource.key && (new_resource.key =~ /http/)
       key_name = new_resource.key.split(/\//).last
@@ -38,6 +39,7 @@ action :add do
         action :nothing
       end.run_action(:run)
     end
+
     # build our listing
     components = new_resource.components
     components = components.join(' ') if components.kind_of?(Array)
@@ -46,21 +48,26 @@ action :add do
     file_content << "deb     #{repo}\n"
     file_content << "deb-src #{repo}\n" if new_resource.deb_src
 
-    # write out the file, replace it if it already exists
-    file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
+    apt_get_update = execute "apt-get update" do
+      ignore_failure true
+      action :nothing
+    end
+
+    source_list = file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
       owner "root"
       group "root"
       mode 0644
       content file_content
       action :nothing
-    end.run_action(:create)
-    execute "update package index" do
-      command "apt-get update"
-      ignore_failure true
-      action :nothing
-    end.run_action(:run)
-    new_resource.updated_by_last_action(true)
-  end
+    end
+
+    # write out the repo file, replace it if it already exists
+    source_list.run_action(:create)
+
+    if source_list.updated_by_last_action?
+      new_resource.updated_by_last_action(true)
+      apt_get_update.run_action(:run)
+    end
 end
 
 action :remove do
