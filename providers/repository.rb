@@ -58,41 +58,41 @@ def repo_file_content(uri, distribution, components, add_deb_src)
 end
 
 action :add do
-    new_resource.updated_by_last_action(false)
+  new_resource.updated_by_last_action(false)
 
-    # add key
-    if new_resource.keyserver && new_resource.key
-      install_key_from_keyserver(new_resource.key, new_resource.keyserver)
-    elsif new_resource.key && (new_resource.key =~ /http/)
-      install_key_from_uri(new_resource.key)
-    end
+  # add key
+  if new_resource.keyserver && new_resource.key
+    install_key_from_keyserver(new_resource.key, new_resource.keyserver)
+  elsif new_resource.key && (new_resource.key =~ /http/)
+    install_key_from_uri(new_resource.key)
+  end
 
-    # build repo file
-    file_content = repo_file_content(new_resource.uri,
-                                     new_resource.distribution,
-                                     new_resource.components,
-                                     new_resource.deb_src)
+  # build repo file
+  file_content = repo_file_content(new_resource.uri,
+                                   new_resource.distribution,
+                                   new_resource.components,
+                                   new_resource.deb_src)
 
-    apt_get_update = execute "apt-get update" do
-      ignore_failure true
-      action :nothing
-    end
+  apt_get_update = execute "apt-get update" do
+    ignore_failure true
+    action :nothing
+  end
 
-    source_list = file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
-      owner "root"
-      group "root"
-      mode 0644
-      content file_content
-      action :nothing
-    end
+  source_list = file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
+    owner "root"
+    group "root"
+    mode 0644
+    content file_content
+    action :nothing
+  end
 
-    # write out the repo file, replace it if it already exists
-    source_list.run_action(:create)
+  # write out the repo file, replace it if it already exists
+  source_list.run_action(:create)
 
-    if source_list.updated_by_last_action?
-      new_resource.updated_by_last_action(true)
-      apt_get_update.run_action(:run)
-    end
+  if source_list.updated_by_last_action?
+    new_resource.updated_by_last_action(true)
+    apt_get_update.run_action(:run)
+  end
 end
 
 action :remove do
