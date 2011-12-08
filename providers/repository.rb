@@ -17,49 +17,81 @@
 # limitations under the License.
 #
 
-action :add do
-  unless ::File.exists?("/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list")
-    Chef::Log.info "Adding #{new_resource.repo_name} repository to /etc/apt/sources.list.d/#{new_resource.repo_name}-source.list"
-    # add key
-    if new_resource.keyserver && new_resource.key
-      execute "install-key #{new_resource.key}" do
-        command "apt-key adv --keyserver #{new_resource.keyserver} --recv #{new_resource.key}"
-        action :nothing
-      end.run_action(:run)
-    elsif new_resource.key && (new_resource.key =~ /http/)
-      key_name = new_resource.key.split(/\//).last
-      remote_file "#{Chef::Config[:file_cache_path]}/#{key_name}" do
-        source new_resource.key
-        mode "0644"
-        action :nothing
-      end.run_action(:create_if_missing)
-      execute "install-key #{key_name}" do
-        command "apt-key add #{Chef::Config[:file_cache_path]}/#{key_name}"
-        action :nothing
-      end.run_action(:run)
-    end
-    # build our listing
-    components = new_resource.components
-    components = components.join(' ') if components.kind_of?(Array)
-    repo = "#{new_resource.uri} #{new_resource.distribution} #{components}"
-    file_content = "# Created by the Chef apt_repository LWRP\n"
-    file_content << "deb     #{repo}\n"
-    file_content << "deb-src #{repo}\n" if new_resource.deb_src
-
-    # write out the file, replace it if it already exists
-    file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
-      owner "root"
-      group "root"
-      mode 0644
-      content file_content
-      action :nothing
-    end.run_action(:create)
-    execute "update package index" do
-      command "apt-get update"
-      ignore_failure true
+# install apt key from keyserver
+def install_key_from_keyserver(key, keyserver)
+  unless system("apt-key list | grep #{key}")
+    execute "install-key #{key}" do
+      command "apt-key adv --keyserver #{keyserver} --recv #{key}"
       action :nothing
     end.run_action(:run)
     new_resource.updated_by_last_action(true)
+  end
+end
+
+# install apt key from URI
+def install_key_from_uri(uri)
+  key_name = uri.split(/\//).last
+  cached_keyfile = "#{Chef::Config[:file_cache_path]}/#{key_name}"
+  unless ::File.exists?(cached_keyfile)
+    remote_file cached_keyfile do
+      source uri
+      mode "0644"
+      action :nothing
+    end.run_action(:run)
+
+    execute "install-key #{key_name}" do
+      command "apt-key add #{cached_keyfile}"
+      action :nothing
+    end.run_action(:run)
+    new_resource.updated_by_last_action(true)
+  end
+end
+
+# build repo file contents
+def repo_file_content(uri, distribution, components, add_deb_src)
+  components = components.join(' ') if components.respond_to?(:join)
+  repo = "#{uri} #{distribution} #{components}"
+  file_content = "# Created by the Chef apt_repository LWRP\n"
+  file_content << "deb     #{repo}\n"
+  file_content << "deb-src #{repo}\n" if add_deb_src
+  file_content
+end
+
+action :add do
+  new_resource.updated_by_last_action(false)
+
+  # add key
+  if new_resource.keyserver && new_resource.key
+    install_key_from_keyserver(new_resource.key, new_resource.keyserver)
+  elsif new_resource.key && (new_resource.key =~ /http/)
+    install_key_from_uri(new_resource.key)
+  end
+
+  # build repo file
+  file_content = repo_file_content(new_resource.uri,
+                                   new_resource.distribution,
+                                   new_resource.components,
+                                   new_resource.deb_src)
+
+  apt_get_update = execute "apt-get update" do
+    ignore_failure true
+    action :nothing
+  end
+
+  repo_file = file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
+    owner "root"
+    group "root"
+    mode 0644
+    content file_content
+    action :nothing
+  end
+
+  # write out the repo file, replace it if it already exists
+  repo_file.run_action(:create)
+
+  if repo_file.updated_by_last_action?
+    new_resource.updated_by_last_action(true)
+    apt_get_update.run_action(:run)
   end
 end
 
