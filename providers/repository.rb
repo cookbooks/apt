@@ -78,7 +78,7 @@ action :add do
     action :nothing
   end
 
-  source_list = file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
+  repo_file = file "/etc/apt/sources.list.d/#{new_resource.repo_name}-source.list" do
     owner "root"
     group "root"
     mode 0644
@@ -87,9 +87,9 @@ action :add do
   end
 
   # write out the repo file, replace it if it already exists
-  source_list.run_action(:create)
+  repo_file.run_action(:create)
 
-  if source_list.updated_by_last_action?
+  if repo_file.updated_by_last_action?
     new_resource.updated_by_last_action(true)
     apt_get_update.run_action(:run)
   end
